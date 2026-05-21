@@ -1,23 +1,73 @@
+# =============================================================================
+# docker-compose.yml
+# -----------------------------------------------------------------------------
+# Defines and orchestrates the services for the Linux & Docker Lab project.
+#
+# Usage:
+#   docker-compose up --build    # Build image and start all services
+#   docker-compose up -d         # Run in detached (background) mode
+#   docker-compose down          # Stop and remove all containers
+#   docker-compose logs -f app   # Stream logs from the app service
+#
+# Compose file format version 3.8 is compatible with Docker Engine 19.03+
+# =============================================================================
+
 version: '3.8'
 
 services:
+
+  # ---------------------------------------------------------------------------
+  # app — Main application service
+  # ---------------------------------------------------------------------------
   app:
+    # Build the image using the Dockerfile in the project root.
+    # 'context: .' means Docker will use the current directory as the
+    # build context (i.e. it can access all files here during the build).
     build:
       context: .
       dockerfile: Dockerfile
+
+    # Give the container a predictable name instead of a random auto-generated one.
+    # Useful for referencing the container in scripts: docker exec linux-lab-app ...
     container_name: linux-lab-app
+
+    # Volume mount: maps the local ./app folder into /app inside the container.
+    # This means code changes on your host are reflected instantly in the container
+    # without needing to rebuild the image — great for development.
     volumes:
-      - ./app:/app        # Mount local app folder for live editing
+      - ./app:/app
+
+    # Inject environment variables into the container at runtime.
+    # The app reads ENV via os.getenv("ENV") to know which mode it's running in.
     environment:
       - ENV=development
+
+    # Restart policy: automatically restart the container if it stops unexpectedly.
+    # Options: no | always | on-failure | unless-stopped
     restart: unless-stopped
 
-  # Uncomment to add a database service later:
+
+  # ---------------------------------------------------------------------------
+  # db — Optional PostgreSQL database service (disabled by default)
+  # ---------------------------------------------------------------------------
+  # Uncomment the block below to add a database to your lab environment.
+  # This demonstrates how Docker Compose orchestrates multiple services.
+  #
   # db:
   #   image: postgres:15
+  #   container_name: linux-lab-db
   #   environment:
   #     POSTGRES_DB: labdb
   #     POSTGRES_USER: admin
-  #     POSTGRES_PASSWORD: secret
+  #     POSTGRES_PASSWORD: secret      # ⚠ Use .env file in real projects
   #   ports:
-  #     - "5432:5432"
+  #     - "5432:5432"                  # host_port:container_port
+  #   volumes:
+  #     - db_data:/var/lib/postgresql/data   # Persist data between restarts
+
+
+# =============================================================================
+# Named volumes (used by services above when enabled)
+# =============================================================================
+# volumes:
+#   db_data:

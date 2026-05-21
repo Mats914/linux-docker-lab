@@ -1,23 +1,42 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-dist/
+# =============================================================================
+# .gitignore
+# -----------------------------------------------------------------------------
+# Specifies files and directories Git should NOT track.
+# These are typically generated files, secrets, or OS/editor artifacts
+# that don't belong in version control.
+# =============================================================================
+
+# --- Python ------------------------------------------------------------------
+__pycache__/          # Compiled Python bytecode cache
+*.py[cod]             # .pyc, .pyo, .pyd compiled files
+*.egg-info/           # Packaging metadata
+.venv/                # Virtual environment (never commit this)
+venv/
+dist/                 # Build output
 build/
 
-# Docker
-.docker/
+# --- Docker ------------------------------------------------------------------
+.docker/              # Local Docker context cache
 
-# OS files
-.DS_Store
-Thumbs.db
+# --- Environment & Secrets ---------------------------------------------------
+# ⚠️  NEVER commit secrets, API keys, or credentials to version control!
+.env                  # Environment variable files
+.env.local
+.env.production
+*.pem                 # SSL/TLS private keys
+secrets/              # Any secrets folder
 
-# Secrets — never commit these!
-.env
-*.pem
-secrets/
+# --- Operating System --------------------------------------------------------
+.DS_Store             # macOS folder metadata
+Thumbs.db             # Windows thumbnail cache
+desktop.ini
 
-# Logs
+# --- IDE / Editor ------------------------------------------------------------
+.vscode/              # VS Code workspace settings
+.idea/                # JetBrains IDE settings
+*.swp                 # Vim swap files
+*.swo
+
+# --- Logs --------------------------------------------------------------------
 *.log
 logs/
