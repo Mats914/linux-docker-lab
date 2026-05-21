@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linux-lab-app
+    volumes:
+      - ./app:/app        # Mount local app folder for live editing
+    environment:
+      - ENV=development
+    restart: unless-stopped
+
+  # Uncomment to add a database service later:
+  # db:
+  #   image: postgres:15
+  #   environment:
+  #     POSTGRES_DB: labdb
+  #     POSTGRES_USER: admin
+  #     POSTGRES_PASSWORD: secret
+  #   ports:
+  #     - "5432:5432"

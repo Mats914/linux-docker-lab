@@ -1,0 +1,7 @@
+# Python dependencies for the lab app
+# Add packages here as you experiment
+
+# No external deps needed for the base demo.
+# Example additions:
+# requests==2.31.0
+# flask==3.0.0
