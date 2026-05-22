@@ -2,61 +2,89 @@
 # =============================================================================
 # cleanup.sh
 # -----------------------------------------------------------------------------
-# Removes all Docker resources created by the Linux & Docker Lab project.
+# Removes Docker resources created by the Linux & Docker Lab project.
 #
-# What this script removes:
-#   - Running containers started via docker-compose
+# Removes:
+#   - Containers started via docker-compose
 #   - The 'linux-lab' Docker image
-#   - Dangling images, stopped containers, and unused networks (docker prune)
+#   - Dangling images, stopped containers, and unused networks
 #
 # Usage:
-#   chmod +x scripts/cleanup.sh     # Make executable (only needed once)
-#   ./scripts/cleanup.sh            # Run from project root
+#   ./scripts/cleanup.sh           # Standard cleanup
+#   ./scripts/cleanup.sh --all     # Also removes ALL unused Docker resources
 #
-# Note:
-#   This script uses '|| true' in several places to prevent the script from
-#   exiting when a resource doesn't exist (e.g. image already deleted).
+# Note: '|| true' is used where failure is acceptable (e.g. resource not found).
 # =============================================================================
 
 set -euo pipefail
 
-echo "=============================================="
-echo "   Linux & Docker Lab — Cleanup"
-echo "=============================================="
+DEEP_CLEAN=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --all) DEEP_CLEAN=true ;;
+    *) echo "Unknown argument: $arg"; exit 1 ;;
+  esac
+done
+
+section() {
+  echo
+  echo "  ── $1"
+}
+
+ok()   { echo "  ✅  $1"; }
+info() { echo "  ℹ️   $1"; }
+
 echo
+echo "  ╔══════════════════════════════════════════╗"
+echo "  ║   Linux & Docker Lab — Cleanup           ║"
+echo "  ╚══════════════════════════════════════════╝"
 
 # --- Step 1: Stop Compose services -------------------------------------------
-# 'docker compose down' stops and removes containers, networks, and volumes
-# defined in docker-compose.yml.
-# '2>/dev/null || true' suppresses errors if Compose was never started.
-echo "  ==> Stopping docker-compose services..."
+section "Stopping docker-compose services"
+
+# 'docker compose down' stops containers AND removes them plus their networks.
+# Redirecting stderr + '|| true' prevents failure if Compose was never started.
 docker compose down 2>/dev/null || true
-echo "  ✅ Compose services stopped"
+ok "Compose services stopped"
 
-# --- Step 2: Remove the lab Docker image -------------------------------------
-# We built this image in setup.sh with the tag 'linux-lab'.
-# '2>/dev/null || true' prevents errors if the image was never built.
-echo
-echo "  ==> Removing 'linux-lab' Docker image..."
-docker rmi linux-lab 2>/dev/null || echo "  ℹ️  Image 'linux-lab' not found — skipping"
-echo "  ✅ Image removed"
+# --- Step 2: Remove the lab image --------------------------------------------
+section "Removing 'linux-lab' image"
 
-# --- Step 3: Prune unused Docker resources ------------------------------------
-# 'docker system prune -f' removes:
-#   - All stopped containers
-#   - All networks not used by at least one container
-#   - All dangling images (untagged layers with no parent)
-#   - All dangling build cache
-#
-# The -f (force) flag skips the confirmation prompt.
-# WARNING: This affects ALL Docker resources on the system, not just this project.
-echo
-echo "  ==> Pruning unused Docker system resources..."
-docker system prune -f
-echo "  ✅ System pruned"
+if docker image inspect linux-lab &>/dev/null 2>&1; then
+  docker rmi linux-lab
+  ok "Image removed"
+else
+  info "Image 'linux-lab' not found — nothing to remove"
+fi
+
+# --- Step 3: Prune dangling resources ----------------------------------------
+section "Pruning dangling Docker resources"
+
+# Removes:
+#   - Stopped containers
+#   - Unused networks
+#   - Dangling images (layers with no tag and no parent image)
+#   - Dangling build cache
+# -f skips the interactive confirmation prompt
+docker image prune -f
+ok "Dangling images pruned"
+
+# --- Step 4: Deep clean (optional) -------------------------------------------
+if [ "$DEEP_CLEAN" = true ]; then
+  section "Deep clean — removing ALL unused Docker resources"
+  echo "  ⚠️   WARNING: This removes ALL unused images on this machine,"
+  echo "       not just those from this project."
+  echo
+  # 'docker system prune -f' is intentionally scoped here.
+  # Use with caution if other Docker projects are running on the same machine.
+  docker system prune -f
+  ok "Full system prune complete"
+fi
 
 # --- Done --------------------------------------------------------------------
 echo
-echo "=============================================="
-echo "  ✅ Cleanup complete. All lab resources removed."
-echo "=============================================="
+echo "  ╔══════════════════════════════════════════╗"
+echo "  ║   ✅  Cleanup complete.                  ║"
+echo "  ╚══════════════════════════════════════════╝"
+echo

@@ -5,32 +5,31 @@
 #
 # Build:   docker build -t linux-lab .
 # Run:     docker run --rm linux-lab
+# Test:    docker run --rm -v "$PWD/tests:/tests" linux-lab python3 -m pytest /tests/ -v
 #
 # Base OS: Ubuntu 22.04 LTS (Jammy Jellyfish)
 # =============================================================================
 
-# --- Stage: Base image -------------------------------------------------------
-# We use Ubuntu 22.04 LTS as the base because it's stable, widely used in
-# production environments, and closely mirrors a real Linux server.
+# --- Base image --------------------------------------------------------------
+# Ubuntu 22.04 LTS is stable, widely used in production, and mirrors
+# real Linux server environments closely.
 FROM ubuntu:22.04
 
 # --- Image metadata ----------------------------------------------------------
-# LABEL instructions add metadata to the image.
-# These are visible via: docker inspect linux-lab
+# Visible via: docker inspect linux-lab
 LABEL maintainer="your-email@example.com"
 LABEL description="Linux & Docker personal lab — containerized Python environment"
 LABEL version="1.0"
 
-# --- Environment variables ---------------------------------------------------
-# DEBIAN_FRONTEND=noninteractive prevents apt from prompting for user input
-# during package installation, which would cause the build to hang.
+# --- Build-time environment --------------------------------------------------
+# DEBIAN_FRONTEND=noninteractive prevents apt from halting on user prompts.
 ENV DEBIAN_FRONTEND=noninteractive
 
 # --- System dependencies -----------------------------------------------------
-# We chain all apt commands into a single RUN layer to:
-#   1. Keep the image small (fewer intermediate layers)
-#   2. Avoid caching stale package lists
-# The final rm -rf clears the apt cache to reduce image size.
+# All apt commands are chained in one RUN layer to:
+#   1. Minimize the number of image layers (smaller image)
+#   2. Prevent stale package list caching between layers
+# Cleanup at the end removes the apt cache from the final image.
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
@@ -38,24 +37,32 @@ RUN apt-get update && apt-get install -y \
     bash \
     && rm -rf /var/lib/apt/lists/*
 
+# --- Non-root user -----------------------------------------------------------
+# Running as root inside a container is a security risk.
+# We create a dedicated app user and switch to it for all subsequent steps.
+RUN useradd --create-home --shell /bin/bash appuser
+USER appuser
+
 # --- Working directory --------------------------------------------------------
-# All subsequent commands (COPY, RUN, CMD) will execute relative to /app.
-# This is the root of our application inside the container.
+# All COPY, RUN, and CMD instructions execute relative to /app.
 WORKDIR /app
 
 # --- Python dependencies -----------------------------------------------------
-# We copy requirements.txt BEFORE copying the full source code.
-# This is a Docker best practice: if requirements haven't changed, Docker
-# reuses the cached pip install layer — speeding up repeated builds.
-COPY app/requirements.txt .
+# requirements.txt is copied first (before source code) to exploit Docker's
+# layer cache: if only source code changes, pip install is skipped entirely.
+COPY --chown=appuser:appuser app/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # --- Application source ------------------------------------------------------
-# Copy the rest of the application files into the container's /app directory.
-COPY app/ .
+# Copy the rest of the app into the container's working directory.
+COPY --chown=appuser:appuser app/ .
+
+# --- Runtime environment variable --------------------------------------------
+# Default value for ENV; can be overridden with: docker run -e ENV=production
+ENV ENV=development
 
 # --- Default command ---------------------------------------------------------
-# This is the command Docker runs when the container starts.
-# Using JSON array format (exec form) is preferred over shell form
-# because it avoids spawning an extra shell process.
+# Exec form (JSON array) is preferred over shell form because it:
+#   - Sends signals (SIGTERM) directly to the Python process
+#   - Does not spawn an extra /bin/sh process
 CMD ["python3", "app.py"]

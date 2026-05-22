@@ -6,15 +6,14 @@
 # Install locally:   pip install -r requirements.txt
 # Inside Docker:     handled automatically by the Dockerfile RUN step
 #
-# Pinning versions (e.g. requests==2.31.0) is a best practice in production
-# to ensure reproducible builds across environments.
+# Pinning exact versions ensures reproducible builds across all environments.
+# To update: pip install --upgrade <package>, then pin the new version here.
 # =============================================================================
 
-# --- No external dependencies for the base demo ------------------------------
-# The app uses only Python standard library modules:
-#   os, platform, socket
-#
-# Add packages below as you extend the lab, for example:
-# requests==2.31.0      # HTTP client library
-# flask==3.0.0          # Lightweight web framework
-# python-dotenv==1.0.0  # Load .env files as environment variables
+# --- Testing -----------------------------------------------------------------
+pytest==7.4.3             # Test framework — used in CI and locally
+
+# --- Future extensions (commented out — uncomment as needed) -----------------
+# requests==2.31.0        # HTTP client — useful for testing API calls
+# flask==3.0.0            # Lightweight web framework
+# python-dotenv==1.0.0    # Load .env files as environment variables

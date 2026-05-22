@@ -4,100 +4,129 @@
 # -----------------------------------------------------------------------------
 # Bootstrap script for the Linux & Docker Lab environment.
 #
-# What this script does:
-#   1. Checks that Docker is installed and the daemon is running
-#   2. Builds the Docker image from the project Dockerfile
-#   3. Runs a hello-world container to verify Docker connectivity
-#   4. Runs the lab application inside the built container
+# Steps:
+#   1. Verify Docker is installed and the daemon is running
+#   2. Build the Docker image from the Dockerfile
+#   3. Run a hello-world smoke test to verify Docker connectivity
+#   4. Run the lab application inside the freshly built container
+#   5. (Optional) Run the test suite inside the container
 #
 # Usage:
-#   chmod +x scripts/setup.sh     # Make executable (only needed once)
+#   chmod +x scripts/setup.sh     # Make executable (first time only)
 #   ./scripts/setup.sh            # Run from project root
+#   ./scripts/setup.sh --test     # Also run the test suite
 #
 # Requirements:
-#   - Docker Engine 20+
+#   - Docker Engine 20+ or Docker Desktop
 #   - Bash 4+
 # =============================================================================
 
 # Strict mode:
-#   -e  exit immediately if any command fails
+#   -e  exit on any error
 #   -u  treat unset variables as errors
-#   -o pipefail  catch errors in piped commands (e.g. cmd1 | cmd2)
+#   -o pipefail  propagate errors through pipes
 set -euo pipefail
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+IMAGE_NAME="linux-lab"
+COMPOSE_FILE="docker-compose.yml"
+RUN_TESTS=false   # Set to true with --test flag
+
+# Parse command-line flags
+for arg in "$@"; do
+  case "$arg" in
+    --test) RUN_TESTS=true ;;
+    *) echo "Unknown argument: $arg"; exit 1 ;;
+  esac
+done
 
 # =============================================================================
 # Helper functions
 # =============================================================================
 
-# Print a formatted section header
+# Print a section divider with a title
 section() {
   echo
-  echo "──────────────────────────────────────────"
-  echo "  $1"
-  echo "──────────────────────────────────────────"
+  echo "  ┌──────────────────────────────────────────┐"
+  printf  "  │  %-42s│\n" "$1"
+  echo "  └──────────────────────────────────────────┘"
 }
 
-# Print a success message
-ok() { echo "  ✅ $1"; }
-
-# Print an error message and exit
-fail() { echo "  ❌ $1"; exit 1; }
+ok()   { echo "  ✅  $1"; }
+info() { echo "  ℹ️   $1"; }
+fail() { echo "  ❌  $1"; exit 1; }
 
 # =============================================================================
-# Main script
+# Main
 # =============================================================================
 
-echo "=============================================="
-echo "   Linux & Docker Lab — Environment Setup"
-echo "=============================================="
+echo
+echo "  ╔══════════════════════════════════════════╗"
+echo "  ║   Linux & Docker Lab — Setup             ║"
+echo "  ╚══════════════════════════════════════════╝"
 
-# --- Step 1: Check Docker installation ----------------------------------------
+# --- Step 1: Verify Docker installation --------------------------------------
 section "Checking dependencies"
 
-# 'command -v docker' returns a non-zero exit code if docker isn't in PATH
 if ! command -v docker &>/dev/null; then
-  fail "Docker not found. Install it from: https://docs.docker.com/get-docker/"
+  fail "Docker not found. Install it: https://docs.docker.com/get-docker/"
 fi
 
-# Extract and display Docker version for confirmation
-DOCKER_VERSION=$(docker --version | cut -d' ' -f3 | tr -d ',')
-ok "Docker $DOCKER_VERSION is installed"
+DOCKER_VERSION=$(docker --version | grep -oP '\d+\.\d+\.\d+' | head -1)
+ok "Docker $DOCKER_VERSION found"
 
-# --- Step 2: Check Docker daemon is running -----------------------------------
-# 'docker info' fails if the daemon isn't running (e.g. Docker Desktop is closed)
-if ! docker info &>/dev/null; then
-  fail "Docker daemon is not running. Please start Docker and try again."
+# Verify Docker daemon is active (fails if Docker Desktop is not running)
+if ! docker info &>/dev/null 2>&1; then
+  fail "Docker daemon is not running. Please start Docker and retry."
 fi
-ok "Docker daemon is active"
+ok "Docker daemon is running"
 
-# --- Step 3: Build the Docker image -------------------------------------------
-section "Building Docker image: linux-lab"
+# --- Step 2: Build the Docker image ------------------------------------------
+section "Building image: $IMAGE_NAME"
 
-# The dot (.) tells Docker to use the current directory as the build context.
-# -t linux-lab assigns a name (tag) to the image.
-docker build -t linux-lab .
-ok "Image built successfully"
+# The dot (.) sets the build context to the current directory.
+# Docker reads the Dockerfile and bundles everything it needs from here.
+docker build -t "$IMAGE_NAME" .
+ok "Image '$IMAGE_NAME' built"
 
-# --- Step 4: Verify Docker works with hello-world ----------------------------
-section "Running connectivity test (hello-world)"
+# Show image size — useful to track bloat over time
+IMAGE_SIZE=$(docker image inspect "$IMAGE_NAME" --format='{{.Size}}' | awk '{printf "%.1f MB", $1/1024/1024}')
+info "Image size: $IMAGE_SIZE"
 
-# --rm automatically removes the container after it exits.
-# This is good practice to avoid accumulating stopped containers.
-docker run --rm hello-world
-ok "hello-world test passed"
+# --- Step 3: Smoke test -------------------------------------------------------
+section "Smoke test (hello-world)"
 
-# --- Step 5: Run the lab application ------------------------------------------
-section "Running linux-lab application"
+# --rm ensures the container is removed after it exits — avoids clutter.
+docker run --rm hello-world > /dev/null
+ok "Docker connectivity confirmed"
 
-docker run --rm linux-lab
-ok "Application ran successfully"
+# --- Step 4: Run the application ---------------------------------------------
+section "Running: $IMAGE_NAME"
+
+docker run --rm "$IMAGE_NAME"
+ok "Application exited cleanly"
+
+# --- Step 5: Run tests (optional) --------------------------------------------
+if [ "$RUN_TESTS" = true ]; then
+  section "Running test suite"
+  docker run --rm \
+    -v "$PWD/tests:/tests" \
+    "$IMAGE_NAME" \
+    python3 -m pytest /tests/ -v --tb=short
+  ok "All tests passed"
+fi
 
 # --- Done --------------------------------------------------------------------
 echo
-echo "=============================================="
-echo "  ✅ Setup complete! Next steps:"
-echo ""
-echo "     docker run --rm linux-lab"
-echo "     docker-compose up --build"
-echo "     ./scripts/cleanup.sh   (when done)"
-echo "=============================================="
+echo "  ╔══════════════════════════════════════════╗"
+echo "  ║   ✅  Setup complete!                    ║"
+echo "  ║                                          ║"
+echo "  ║   docker run --rm $IMAGE_NAME            ║"
+echo "  ║   docker-compose up --build              ║"
+echo "  ║   ./scripts/setup.sh --test              ║"
+echo "  ║   ./scripts/cleanup.sh                   ║"
+echo "  ╚══════════════════════════════════════════╝"
+echo

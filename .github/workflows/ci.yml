@@ -1,0 +1,105 @@
+# =============================================================================
+# ci.yml — GitHub Actions CI Pipeline
+# -----------------------------------------------------------------------------
+# This workflow runs automatically on every push and pull request to main.
+# It validates the Docker build and runs the test suite inside the container.
+#
+# Triggers:
+#   - Push to main or develop branches
+#   - Any pull request targeting main
+#
+# Jobs:
+#   1. lint     — Validates shell scripts with ShellCheck
+#   2. build    — Builds the Docker image and verifies it starts correctly
+#   3. test     — Runs the Python test suite inside the container
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint shell scripts with ShellCheck
+  # ShellCheck catches common Bash mistakes before they cause runtime errors.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint Shell Scripts
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck on all scripts
+        run: |
+          # Check every .sh file in the scripts/ directory
+          shellcheck scripts/setup.sh
+          shellcheck scripts/cleanup.sh
+          echo "✅ All shell scripts passed ShellCheck"
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Build the Docker image
+  # Ensures the Dockerfile is valid and the image builds without errors.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-22.04
+    needs: lint   # Only runs if the lint job passes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        # Buildx enables advanced build features like multi-platform support
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t linux-lab:ci .
+          echo "✅ Docker image built successfully"
+
+      - name: Verify image exists
+        run: docker images linux-lab:ci
+
+      - name: Run hello-world smoke test
+        # Quick sanity check: if Docker networking works, the pipeline is healthy
+        run: docker run --rm hello-world
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Run tests inside the container
+  # Executes the Python test suite in the exact same environment as production.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run Tests
+    runs-on: ubuntu-22.04
+    needs: build  # Only runs if the build job passes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image for testing
+        run: docker build -t linux-lab:test .
+
+      - name: Run Python unit tests inside container
+        run: |
+          docker run --rm \
+            -v "$PWD/tests:/tests" \
+            linux-lab:test \
+            python3 -m pytest /tests/ -v --tb=short
+
+      - name: Run app smoke test
+        # Verify the main application exits with code 0 (no crash)
+        run: |
+          docker run --rm linux-lab:test
+          echo "✅ Application smoke test passed"

@@ -1,15 +1,16 @@
 # =============================================================================
 # docker-compose.yml
 # -----------------------------------------------------------------------------
-# Defines and orchestrates the services for the Linux & Docker Lab project.
+# Service orchestration for the Linux & Docker Lab project.
 #
-# Usage:
-#   docker-compose up --build    # Build image and start all services
-#   docker-compose up -d         # Run in detached (background) mode
-#   docker-compose down          # Stop and remove all containers
-#   docker-compose logs -f app   # Stream logs from the app service
+# Commands:
+#   docker-compose up --build        # Build and start all services
+#   docker-compose up -d             # Start in detached (background) mode
+#   docker-compose down              # Stop and remove all containers
+#   docker-compose logs -f app       # Stream logs from the app service
+#   docker-compose run --rm app bash # Open a shell in a one-off container
 #
-# Compose file format version 3.8 is compatible with Docker Engine 19.03+
+# Compose file format 3.8 requires Docker Engine 19.03+
 # =============================================================================
 
 version: '3.8'
@@ -20,54 +21,60 @@ services:
   # app — Main application service
   # ---------------------------------------------------------------------------
   app:
-    # Build the image using the Dockerfile in the project root.
-    # 'context: .' means Docker will use the current directory as the
-    # build context (i.e. it can access all files here during the build).
     build:
       context: .
       dockerfile: Dockerfile
 
-    # Give the container a predictable name instead of a random auto-generated one.
-    # Useful for referencing the container in scripts: docker exec linux-lab-app ...
+    # A predictable name makes it easier to reference in scripts:
+    #   docker exec linux-lab-app bash
     container_name: linux-lab-app
 
-    # Volume mount: maps the local ./app folder into /app inside the container.
-    # This means code changes on your host are reflected instantly in the container
-    # without needing to rebuild the image — great for development.
+    # Volume mount: sync the local ./app directory into the container.
+    # Changes to source files are reflected immediately — no rebuild needed.
+    # Remove this in production (you want a fully baked image, not a mount).
     volumes:
       - ./app:/app
 
-    # Inject environment variables into the container at runtime.
-    # The app reads ENV via os.getenv("ENV") to know which mode it's running in.
+    # Runtime environment variables injected into the container.
+    # Read in app.py via: os.getenv("ENV")
+    # Override from CLI:  docker-compose run -e ENV=staging app
     environment:
       - ENV=development
 
-    # Restart policy: automatically restart the container if it stops unexpectedly.
-    # Options: no | always | on-failure | unless-stopped
+    # Restart policy controls what Docker does when the container exits.
+    #   no             — never restart (good for one-shot tasks)
+    #   always         — always restart, even on clean exit
+    #   on-failure     — only restart on non-zero exit codes
+    #   unless-stopped — restart unless manually stopped (used here)
     restart: unless-stopped
 
 
   # ---------------------------------------------------------------------------
-  # db — Optional PostgreSQL database service (disabled by default)
+  # db — PostgreSQL database (optional, disabled by default)
   # ---------------------------------------------------------------------------
-  # Uncomment the block below to add a database to your lab environment.
-  # This demonstrates how Docker Compose orchestrates multiple services.
+  # Uncomment to add a database service and practice multi-container setups.
+  # This is a realistic pattern used in most web application stacks.
   #
   # db:
-  #   image: postgres:15
+  #   image: postgres:15-alpine          # Alpine variant is smaller (~70 MB vs ~380 MB)
   #   container_name: linux-lab-db
   #   environment:
   #     POSTGRES_DB: labdb
   #     POSTGRES_USER: admin
-  #     POSTGRES_PASSWORD: secret      # ⚠ Use .env file in real projects
+  #     POSTGRES_PASSWORD: secret        # ⚠ Use a .env file — never hardcode secrets
   #   ports:
-  #     - "5432:5432"                  # host_port:container_port
+  #     - "5432:5432"                    # Expose to host for tools like DBeaver/pgAdmin
   #   volumes:
-  #     - db_data:/var/lib/postgresql/data   # Persist data between restarts
+  #     - db_data:/var/lib/postgresql/data  # Named volume persists data across restarts
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U admin -d labdb"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
 
 # =============================================================================
-# Named volumes (used by services above when enabled)
+# Named volumes — persistent storage managed by Docker (not tied to host paths)
 # =============================================================================
 # volumes:
 #   db_data:
