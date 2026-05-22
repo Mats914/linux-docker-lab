@@ -32,7 +32,6 @@ set -euo pipefail
 # =============================================================================
 
 IMAGE_NAME="linux-lab"
-COMPOSE_FILE="docker-compose.yml"
 RUN_TESTS=false   # Set to true with --test flag
 
 # Parse command-line flags
