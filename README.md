@@ -107,10 +107,10 @@ docker run -it --rm linux-lab bash
 docker run --rm -v "$PWD/tests:/tests" linux-lab python3 -m pytest /tests/ -v
 
 # Use Docker Compose
-docker-compose up --build           # Build and start
-docker-compose up -d                # Start in background
-docker-compose logs -f app          # Stream logs
-docker-compose down                 # Stop and remove
+docker compose up --build           # Build and start
+docker compose up -d                # Start in background
+docker compose logs -f app          # Stream logs
+docker compose down                 # Stop and remove
 ```
 
 ---

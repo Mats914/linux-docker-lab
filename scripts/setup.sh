@@ -124,7 +124,7 @@ echo "  ╔═══════════════════════
 echo "  ║   ✅  Setup complete!                    ║"
 echo "  ║                                          ║"
 echo "  ║   docker run --rm $IMAGE_NAME            ║"
-echo "  ║   docker-compose up --build              ║"
+echo "  ║   docker compose up --build              ║"
 echo "  ║   ./scripts/setup.sh --test              ║"
 echo "  ║   ./scripts/cleanup.sh                   ║"
 echo "  ╚══════════════════════════════════════════╝"
