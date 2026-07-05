@@ -75,6 +75,18 @@ jobs:
         # Quick sanity check: if Docker networking works, the pipeline is healthy
         run: docker run --rm hello-world
 
+      - name: Save image to a tarball
+        # Persist the already-built image so the test job can reuse it
+        # instead of rebuilding from scratch.
+        run: docker save linux-lab:ci -o /tmp/linux-lab-ci.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-lab-image
+          path: /tmp/linux-lab-ci.tar
+          retention-days: 1
+
   # ---------------------------------------------------------------------------
   # Job 3: Run tests inside the container
   # Executes the Python test suite in the exact same environment as production.
@@ -88,18 +100,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker image for testing
-        run: docker build -t linux-lab:test .
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-lab-image
+          path: /tmp
+
+      - name: Load Docker image
+        # Reuses the exact image built in the "build" job — no rebuild needed.
+        run: docker load -i /tmp/linux-lab-ci.tar
 
       - name: Run Python unit tests inside container
         run: |
           docker run --rm \
             -v "$PWD/tests:/tests" \
-            linux-lab:test \
+            linux-lab:ci \
             python3 -m pytest /tests/ -v --tb=short
 
       - name: Run app smoke test
         # Verify the main application exits with code 0 (no crash)
         run: |
-          docker run --rm linux-lab:test
+          docker run --rm linux-lab:ci
           echo "✅ Application smoke test passed"
