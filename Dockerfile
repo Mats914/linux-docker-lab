@@ -13,7 +13,21 @@
 # --- Base image --------------------------------------------------------------
 # Ubuntu 22.04 LTS is stable, widely used in production, and mirrors
 # real Linux server environments closely.
-FROM ubuntu:22.04
+#
+# Pinned to a specific digest (not just the "22.04" tag) for fully
+# reproducible builds — the tag alone can point to different content
+# over time as Canonical rebuilds the image with security patches.
+#
+# To (re)generate this digest yourself:
+#   docker pull ubuntu:22.04
+#   docker inspect --format='{{index .RepoDigests 0}}' ubuntu:22.04
+#
+# Replace the digest below with the output, then commit the change.
+# Since a pinned digest will NOT receive security updates automatically,
+# consider automating this refresh with Renovate or Dependabot (see
+# .github/renovate.json / .github/dependabot.yml) rather than doing it
+# by hand.
+FROM ubuntu:22.04@sha256:REPLACE_WITH_DIGEST_FROM_DOCKER_PULL
 
 # --- Image metadata ----------------------------------------------------------
 # Visible via: docker inspect linux-lab
